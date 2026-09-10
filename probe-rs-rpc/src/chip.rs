@@ -15,7 +15,7 @@ pub struct JEP106Code {
     pub cc: u8,
 }
 
-#[derive(Serialize, Deserialize, Clone, Schema)]
+#[derive(Debug, Serialize, Deserialize, Clone, Schema)]
 pub struct ChipFamily {
     /// This is the name of the chip family in base form.
     /// E.g. `nRF52832`.
