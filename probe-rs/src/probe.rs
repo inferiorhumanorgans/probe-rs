@@ -335,6 +335,11 @@ impl Probe {
         self.inner.get_name().to_string()
     }
 
+    /// Get firmware version string.
+    pub fn get_firmware_version(&mut self) -> Result<String, DebugProbeError> {
+        self.inner.get_firmware_version()
+    }
+
     /// Attach to the chip.
     ///
     /// This runs all the necessary protocol init routines.
@@ -693,6 +698,13 @@ pub trait ProbeFactory: std::any::Any + std::fmt::Display + std::fmt::Debug + Sy
 pub trait DebugProbe: Any + Send + fmt::Debug {
     /// Get human readable name for the probe.
     fn get_name(&self) -> &str;
+
+    /// Get firmware version string.
+    fn get_firmware_version(&mut self) -> Result<String, DebugProbeError> {
+        Err(DebugProbeError::NotImplemented {
+            function_name: "get_firmware_version",
+        })
+    }
 
     /// Get the currently used maximum speed for the debug protocol in kHz.
     ///

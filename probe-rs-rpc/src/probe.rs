@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{Key, RpcResult, Session};
 
-// Separate from DebugProbeInfo because we can't serialize a &dyn ProbeFactory
+/// RPC version of [`DebugProbeInfo`].
+///
+/// This is separate from DebugProbeInfo because we can't serialize a &dyn ProbeFactory
 #[derive(Debug, Serialize, Deserialize, Clone, Schema)]
 pub struct DebugProbeEntry {
     /// The name of the debug probe.
@@ -20,6 +22,8 @@ pub struct DebugProbeEntry {
     pub interface: Option<u8>,
     /// The serial number of the debug probe.
     pub serial_number: String,
+    /// The firmware version as a human readable string.
+    pub firmware_version: Option<String>,
 
     pub probe_type: String,
 

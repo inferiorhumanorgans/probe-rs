@@ -34,7 +34,9 @@ use crate::probe::jlink::bits::IteratorExt;
 use crate::probe::jlink::config::JlinkConfig;
 use crate::probe::jlink::connection::JlinkConnection;
 use crate::probe::usb_util::InterfaceExt;
-use crate::probe::{BitbangJtag, JtagChain, JtagChainAccess, JtagChainState, TapState};
+use crate::probe::{
+    BitbangJtag, BoxedProbeError, JtagChain, JtagChainAccess, JtagChainState, TapState,
+};
 use crate::{
     architecture::{
         arm::{ArmCommunicationInterface, SwoAccess, swo::SwoConfig},
@@ -1002,6 +1004,11 @@ impl DebugProbe for JLink {
 
     fn get_name(&self) -> &'static str {
         "J-Link"
+    }
+
+    fn get_firmware_version(&mut self) -> Result<String, DebugProbeError> {
+        self.read_firmware_version()
+            .map_err(|e| DebugProbeError::ProbeSpecific(BoxedProbeError::from(e)))
     }
 
     fn speed_khz(&self) -> u32 {
