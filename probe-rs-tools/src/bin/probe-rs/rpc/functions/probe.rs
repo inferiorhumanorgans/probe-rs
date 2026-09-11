@@ -17,10 +17,10 @@ pub fn list_probes(ctx: &mut RpcContext, _header: VarHeader, _request: ()) -> Li
     let lister = ctx.lister();
     let probes = lister.list_all_with_access();
 
-    Ok(probes
+    probes
         .into_iter()
         .map(convert::to_wire_debug_probe_entry)
-        .collect::<Vec<_>>())
+        .collect::<Result<Vec<_>, _>>()
 }
 
 pub async fn select_probe(
@@ -58,11 +58,14 @@ pub async fn select_probe(
     match list.len() {
         0 => Err(OperationError::NoProbesFound.into()),
         1 => Ok(SelectProbeResult::Success(with_interface(
-            convert::to_wire_debug_probe_entry(list.swap_remove(0)),
+            convert::to_wire_debug_probe_entry(list.swap_remove(0))?,
         ))),
         _ => Ok(SelectProbeResult::MultipleProbes(
             list.into_iter()
-                .map(|e| with_interface(convert::to_wire_debug_probe_entry(e)))
+                .map(|e| convert::to_wire_debug_probe_entry(e))
+                .collect::<RpcResult<Vec<_>>>()?
+                .into_iter()
+                .map(with_interface)
                 .collect(),
         )),
     }
@@ -365,7 +368,8 @@ mod tests {
         wait_for_probe: Option<Duration>,
     ) -> Result<AttachResult, ClientError> {
         let probe =
-            convert::to_wire_debug_probe_entry(ProbeListItem::accessible(lister.info.clone()));
+            convert::to_wire_debug_probe_entry(ProbeListItem::accessible(lister.info.clone()))
+                .map_err(ClientError::Remote)?;
 
         let (server, tx, rx) = RpcApp::create_server_with_lister(
             16,
@@ -491,19 +495,25 @@ pub(crate) mod convert {
     use super::{AttachRequest, DebugProbeEntry, WireProtocol};
     use crate::util::common_options::ProbeOptions;
     use probe_rs::probe::list::{Accessibility, ProbeListItem};
+    use probe_rs_rpc::RpcResult;
 
-    pub(crate) fn to_wire_debug_probe_entry(item: ProbeListItem) -> DebugProbeEntry {
+    pub(crate) fn to_wire_debug_probe_entry(item: ProbeListItem) -> RpcResult<DebugProbeEntry> {
         let inaccessible = item.accessibility == Accessibility::PermissionDenied;
         let probe = item.info;
-        DebugProbeEntry {
+
+        let mut p = probe.open().map_err(|e| e.to_string())?;
+        tracing::info!(fw=?p.get_firmware_version());
+
+        Ok(DebugProbeEntry {
             probe_type: probe.probe_type(),
             inaccessible,
             identifier: probe.identifier,
             vendor_id: probe.vendor_id,
             product_id: probe.product_id,
             serial_number: probe.serial_number.unwrap_or_default(),
+            firmware_version: p.get_firmware_version().ok(),
             interface: probe.interface,
-        }
+        })
     }
 
     pub(crate) fn from_wire_protocol(protocol: WireProtocol) -> probe_rs::probe::WireProtocol {

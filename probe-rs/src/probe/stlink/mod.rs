@@ -105,6 +105,11 @@ impl DebugProbe for StLink<StLinkUsbDevice> {
         &self.name
     }
 
+    fn get_firmware_version(&mut self) -> Result<String, DebugProbeError> {
+        let (major, minor) = self.get_version()?;
+        Ok(format!("STLink v{major}.{minor}"))
+    }
+
     fn speed_khz(&self) -> u32 {
         match self.protocol {
             WireProtocol::Swd => self.swd_speed_khz,
