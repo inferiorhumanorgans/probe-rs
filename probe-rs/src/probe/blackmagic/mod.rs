@@ -1021,7 +1021,7 @@ impl BlackMagicProbe {
 
         for swdio in swdio_sequence {
             let dir: SwdDirection = swdio.into();
-            if dir != self.swd_direction
+            if (dir != self.swd_direction && accumulator_length > 0)
                 || accumulator_length >= core::mem::size_of_val(&accumulator) * 8
             {
                 // Inputs are off-by-one due to input latency. Remove one bit
@@ -1054,6 +1054,14 @@ impl BlackMagicProbe {
         }
 
         if accumulator_length > 0 {
+            // Do this song and dance here just in case the end of the batch is an input
+            // sequence on the chance that the next batch starts with an output sequence.
+            if self.swd_direction == SwdDirection::Input && accumulator_length >= 2 {
+                accumulator_length -= 2;
+                output.push(false);
+                output.push(false);
+            }
+
             self.drain_swd_accumulator(&mut output, accumulator, accumulator_length)?;
         }
 
