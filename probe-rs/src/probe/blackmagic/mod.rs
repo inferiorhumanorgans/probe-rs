@@ -33,6 +33,7 @@ use crate::{
 };
 use bitfield::bitfield;
 use bitvec::vec::BitVec;
+use itertools::Itertools as _;
 use serialport::{SerialPortType, available_ports};
 
 use crate::probe::{Batch, BitSequence};
@@ -1019,16 +1020,25 @@ impl BlackMagicProbe {
         let mut accumulator = 0u32;
         let mut accumulator_length = 0;
 
-        for swdio in swdio_sequence {
+        for (position, swdio) in swdio_sequence.with_position() {
             let dir: SwdDirection = swdio.into();
-            if (dir != self.swd_direction && accumulator_length > 0)
+            let direction_change = dir != self.swd_direction;
+            let trailing_input = dir == SwdDirection::Input && position.is_last();
+
+            if (direction_change && !position.is_first())
+                || trailing_input
                 || accumulator_length >= core::mem::size_of_val(&accumulator) * 8
             {
+                let should_trim_input =
+                    (direction_change && dir == SwdDirection::Output) || trailing_input;
+
                 // Inputs are off-by-one due to input latency. Remove one bit
                 // from the accumulator and store the turnaround bit at the end of
                 // the transaction.
-                if self.swd_direction == SwdDirection::Input && dir == SwdDirection::Output {
-                    accumulator_length -= 2;
+                if should_trim_input {
+                    accumulator_length = accumulator_length.checked_sub(2).expect(
+                        "Since we're not first we should never be here. Please report this.",
+                    );
                 }
 
                 // Drain the accumulator to the BMP, either writing bits to the device
@@ -1036,7 +1046,7 @@ impl BlackMagicProbe {
                 self.drain_swd_accumulator(&mut output, accumulator, accumulator_length)?;
 
                 // Input -> Output transition
-                if self.swd_direction == SwdDirection::Input && dir == SwdDirection::Output {
+                if should_trim_input {
                     output.push(false);
                     output.push(false);
                 }
@@ -1044,7 +1054,9 @@ impl BlackMagicProbe {
                 accumulator = 0;
                 accumulator_length = 0;
             }
+
             self.swd_direction = dir;
+
             accumulator |= if let IoSequenceItem::Output(true) = swdio {
                 1 << accumulator_length
             } else {
@@ -1054,14 +1066,6 @@ impl BlackMagicProbe {
         }
 
         if accumulator_length > 0 {
-            // Do this song and dance here just in case the end of the batch is an input
-            // sequence on the chance that the next batch starts with an output sequence.
-            if self.swd_direction == SwdDirection::Input && accumulator_length >= 2 {
-                accumulator_length -= 2;
-                output.push(false);
-                output.push(false);
-            }
-
             self.drain_swd_accumulator(&mut output, accumulator, accumulator_length)?;
         }
 
