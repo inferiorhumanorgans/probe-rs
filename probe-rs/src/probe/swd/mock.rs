@@ -42,6 +42,17 @@ pub(crate) struct RecordedSequence {
     pub bits: BitSequence,
 }
 
+/// One recorded pins operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RecordedPins {
+    /// The output levels.
+    pub out: u8,
+    /// The pin select mask.
+    pub select: u8,
+    /// The maximum wait time.
+    pub wait: std::time::Duration,
+}
+
 /// Mock probe that records SWD operations.
 #[derive(Debug)]
 pub(crate) struct MockSwdProbe {
@@ -55,6 +66,8 @@ pub(crate) struct MockSwdProbe {
     handles_ap_pipeline: bool,
     capture_flags: Arc<Mutex<Vec<bool>>>,
     idles: Arc<Mutex<Vec<u32>>>,
+    pins: Arc<Mutex<Vec<RecordedPins>>>,
+    swd_settings: SwdSettings,
 }
 
 impl MockSwdProbe {
@@ -71,12 +84,19 @@ impl MockSwdProbe {
             handles_ap_pipeline: false,
             capture_flags: Arc::new(Mutex::new(Vec::new())),
             idles: Arc::new(Mutex::new(Vec::new())),
+            pins: Arc::new(Mutex::new(Vec::new())),
+            swd_settings: SwdSettings::default(),
         }
     }
 
     /// Return a handle to the recorded operations.
     pub(crate) fn shared_operations(&self) -> Arc<Mutex<Vec<RecordedOp>>> {
         self.operations.clone()
+    }
+
+    /// Return a handle to the recorded pins operations.
+    pub(crate) fn shared_pins(&self) -> Arc<Mutex<Vec<RecordedPins>>> {
+        self.pins.clone()
     }
 
     /// Return a handle to the recorded sequences.
@@ -96,9 +116,12 @@ impl MockSwdProbe {
         self
     }
 
-    /// Create a mock probe. `settings` is unused.
-    pub(crate) fn with_settings(_settings: SwdSettings) -> Self {
-        Self::new()
+    /// Create a mock probe that reports `settings`.
+    pub(crate) fn with_settings(settings: SwdSettings) -> Self {
+        Self {
+            swd_settings: settings,
+            ..Self::new()
+        }
     }
 
     /// Queue the next transfer response.
@@ -275,7 +298,13 @@ impl SwdProbe for MockSwdProbe {
                         .unwrap()
                         .push(RecordedSequence { bits: bits.clone() });
                 }
-                SwdOp::Pins { .. } => {}
+                SwdOp::Pins { out, select, wait } => {
+                    self.pins.lock().unwrap().push(RecordedPins {
+                        out: out.0,
+                        select: select.0,
+                        wait: *wait,
+                    });
+                }
             }
         }
 
@@ -288,5 +317,9 @@ impl SwdProbe for MockSwdProbe {
 
     fn handles_ap_pipeline(&self) -> bool {
         self.handles_ap_pipeline
+    }
+
+    fn swd_settings(&self) -> SwdSettings {
+        self.swd_settings.clone()
     }
 }
