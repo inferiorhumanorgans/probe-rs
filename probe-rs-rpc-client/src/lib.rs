@@ -710,6 +710,13 @@ impl RpcClient {
             .await
     }
 
+    pub async fn target_metadata(
+        &self,
+        request: TargetMetadataRequest,
+    ) -> Result<WireSessionTargetMetadata, ClientError> {
+        self.send_resp::<TargetMetadataEndpoint, _>(&request).await
+    }
+
     pub async fn load_chip_family(&self, families_yaml: String) -> Result<(), ClientError> {
         self.send_resp::<LoadChipFamilyEndpoint, _>(&LoadChipFamilyRequest { families_yaml })
             .await
