@@ -5,7 +5,7 @@ use std::time::Duration;
 use postcard_schema::Schema;
 use serde::{Deserialize, Serialize};
 
-use crate::{Key, RpcResult, Session};
+use crate::{Key, NoResponse, RpcResult, Session};
 
 /// RPC version of [`DebugProbeInfo`].
 ///
@@ -123,3 +123,10 @@ pub struct AttachRequest {
 }
 
 pub type AttachResponse = RpcResult<AttachResult>;
+
+#[derive(Clone, Debug, Serialize, Deserialize, Schema)]
+pub struct DetachRequest {
+    pub sessid: Key<Session>,
+}
+
+pub type DetachResponse = NoResponse;
